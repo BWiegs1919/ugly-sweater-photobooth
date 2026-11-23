@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Photo Booth">
+<meta name="theme-color" content="#0d1f14">
+<title>Wiegman Ugly Sweater Photo Booth</title>
+<link rel="apple-touch-icon" id="touchIcon" href="">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Mountains+of+Christmas:wght@700&family=Kaushan+Script&family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --red:#c8102e; --red-d:#8f0b20; --green:#1b6b3a; --green-d:#0d1f14;
+    --gold:#f2c14e; --cream:#fff8ec; --ink:#14110f;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+  html,body{margin:0;height:100%;overflow:hidden;background:radial-gradient(ellipse at top,#173a24 0%,var(--green-d) 70%);color:var(--cream);font-family:Fredoka,system-ui,sans-serif;touch-action:manipulation}
+  body{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+  button{font-family:inherit;cursor:pointer;border:0}
+  .screen{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;padding:calc(env(safe-area-inset-top) + 12px) 16px calc(env(safe-area-inset-bottom) + 12px)}
+  .screen.on{display:flex}
+
+  /* snow */
+  .snow{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:0}
+  .snow i{position:absolute;top:-10px;width:8px;height:8px;border-radius:50%;background:#fff;opacity:.55;animation:fall linear infinite}
+  @keyframes fall{to{transform:translate3d(30px,110vh,0)}}
+
+  /* splash */
+  #splash h1{font-family:"Mountains of Christmas",Georgia,serif;font-size:clamp(48px,9vw,110px);margin:0 0 6px;color:#fff;text-shadow:0 4px 0 var(--red-d),0 8px 24px rgba(0,0,0,.4);text-align:center;line-height:1}
+  #splash p{margin:0 0 34px;font-size:clamp(17px,2.2vw,24px);opacity:.85;text-align:center;max-width:640px}
+  .big{background:var(--red);color:#fff;font-size:clamp(24px,3.2vw,36px);font-weight:700;padding:22px 54px;border-radius:999px;box-shadow:0 8px 0 var(--red-d),0 14px 30px rgba(0,0,0,.35);transition:transform .08s}
+  .big:active{transform:translateY(6px);box-shadow:0 2px 0 var(--red-d)}
+  .err{max-width:620px;margin-top:26px;background:rgba(0,0,0,.35);padding:18px 22px;border-radius:16px;font-size:18px;line-height:1.45;display:none}
+
+  /* home */
+  #home{justify-content:flex-start;gap:14px}
+  .topbar{width:100%;display:flex;justify-content:space-between;align-items:center;z-index:2;min-height:56px}
+  .brand{font-family:"Mountains of Christmas",Georgia,serif;font-size:clamp(30px,4vw,46px);color:#fff;text-shadow:0 3px 0 var(--red-d)}
+  .icons{display:flex;gap:10px}
+  .ic{width:56px;height:56px;border-radius:16px;background:rgba(255,255,255,.12);color:#fff;font-size:26px;display:grid;place-items:center;position:relative}
+  .ic:active{background:rgba(255,255,255,.25)}
+  .ic .badge{position:absolute;top:-6px;right:-6px;background:var(--gold);color:var(--ink);font-size:13px;font-weight:700;min-width:24px;height:24px;border-radius:12px;display:grid;place-items:center;padding:0 6px}
+  #gear .ring{position:absolute;inset:0;border-radius:16px;border:3px solid var(--gold);clip-path:inset(100% 0 0 0);transition:none}
+  #gear.holding .ring{clip-path:inset(0 0 0 0);transition:clip-path 1s linear}
+  .stage{position:relative;z-index:1;flex:1;display:flex;align-items:center;justify-content:center;width:100%;min-height:0}
+  #preview{display:block;border-radius:14px;box-shadow:0 18px 50px rgba(0,0,0,.5);background:#000}
+  .controls{display:flex;flex-direction:column;align-items:center;gap:14px;z-index:2;width:100%}
+  .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  .chip{background:rgba(255,255,255,.12);color:#fff;padding:12px 20px;border-radius:999px;font-size:clamp(16px,1.8vw,20px);font-weight:600;border:2px solid transparent}
+  .chip.sel{background:var(--cream);color:var(--ink);border-color:var(--gold)}
+  .seg{display:flex;background:rgba(0,0,0,.3);border-radius:999px;padding:5px}
+  .seg button{background:transparent;color:#fff;padding:10px 22px;border-radius:999px;font-size:clamp(16px,1.8vw,20px);font-weight:600}
+  .seg button.sel{background:var(--green);box-shadow:inset 0 0 0 2px #2f9a58}
+  body.capturing .controls,body.capturing .topbar .icons{visibility:hidden}
+
+  /* countdown overlay */
+  #overlay{position:fixed;inset:0;pointer-events:none;display:grid;place-items:center;z-index:5}
+  #count{font-family:Fredoka,sans-serif;font-weight:700;font-size:min(40vw,40vh);color:#fff;text-shadow:0 8px 0 var(--red-d),0 0 60px rgba(0,0,0,.6);opacity:0}
+  #count.pop{animation:pop 1s ease-out forwards}
+  @keyframes pop{0%{transform:scale(1.6);opacity:0}15%{transform:scale(1);opacity:1}80%{opacity:1}100%{transform:scale(.8);opacity:0}}
+  #shotlabel{position:fixed;top:calc(env(safe-area-inset-top) + 18px);left:50%;transform:translateX(-50%);background:var(--red);color:#fff;font-weight:700;font-size:24px;padding:10px 24px;border-radius:999px;z-index:6;display:none}
+  body.capturing #shotlabel{display:block}
+  #flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:7}
+  #flash.go{animation:flash .45s ease-out}
+  @keyframes flash{0%{opacity:1}100%{opacity:0}}
+
+  /* result */
+  #result{gap:20px}
+  #result h2{font-family:"Mountains of Christmas",Georgia,serif;font-size:clamp(36px,5vw,60px);margin:0;color:#fff;text-shadow:0 3px 0 var(--red-d)}
+  #resultImg{max-width:94vw;max-height:calc(100vh - 290px);border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,.5)}
+  .btns{display:flex;gap:16px;flex-wrap:wrap;justify-content:center}
+  .btn{font-size:clamp(19px,2.2vw,24px);font-weight:700;padding:18px 30px;border-radius:999px;color:#fff}
+  .btn.primary{background:var(--red);box-shadow:0 6px 0 var(--red-d)}
+  .btn.primary:active{transform:translateY(4px);box-shadow:0 2px 0 var(--red-d)}
+  .btn.ghost{background:rgba(255,255,255,.14)}
+  .hint{opacity:.75;font-size:17px;text-align:center}
+
+  /* gallery */
+  #gallery{justify-content:flex-start;gap:14px}
+  #gallery .topbar h2{margin:0;font-family:"Mountains of Christmas",Georgia,serif;font-size:clamp(32px,4vw,46px)}
+  #grid{flex:1;width:100%;overflow-y:auto;-webkit-overflow-scrolling:touch;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;align-content:start;padding-bottom:20px}
+  #grid img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:10px;display:block;box-shadow:0 6px 18px rgba(0,0,0,.35)}
+  #grid .empty{grid-column:1/-1;text-align:center;opacity:.7;font-size:20px;padding:60px 0}
+
+  /* modal */
+  .modal{position:fixed;inset:0;background:rgba(5,12,8,.86);display:none;align-items:center;justify-content:center;z-index:20;padding:20px;flex-direction:column;gap:18px}
+  .modal.on{display:flex}
+  #viewImg{max-width:94vw;max-height:calc(100vh - 170px);border-radius:12px}
+  .card{background:var(--cream);color:var(--ink);border-radius:22px;padding:26px 28px;width:min(560px,94vw);max-height:90vh;overflow-y:auto}
+  .card h3{margin:0 0 16px;font-size:26px}
+  .card label{display:block;font-weight:600;margin:14px 0 6px;font-size:16px}
+  .card input[type=text]{width:100%;font:inherit;font-size:18px;padding:12px 14px;border-radius:12px;border:2px solid #d9cfbf;background:#fff;-webkit-user-select:text;user-select:text}
+  .slider{display:flex;gap:12px;align-items:center}
+  .slider input[type=range]{flex:1;accent-color:var(--red);height:32px}
+  .slider input[type=number]{width:84px;font:inherit;font-size:18px;padding:10px;border-radius:12px;border:2px solid #d9cfbf;text-align:center;-webkit-user-select:text;user-select:text}
+  .check{display:flex;align-items:center;gap:12px;margin-top:16px;font-weight:600}
+  .check input{width:26px;height:26px;accent-color:var(--green)}
+  .card .btns{margin-top:22px;justify-content:space-between}
+  .card .btn{font-size:18px;padding:14px 22px}
+  .btn.dark{background:var(--ink)}
+  .btn.danger{background:#fff;color:var(--red);box-shadow:inset 0 0 0 2px var(--red)}
+  .small{font-size:14px;opacity:.7;margin-top:6px;line-height:1.4}
+
+  [hidden]{display:none!important}
+  #toast:not(.on){opacity:0;visibility:hidden}
+  #toast{position:fixed;bottom:calc(env(safe-area-inset-bottom) + 24px);left:50%;transform:translateX(-50%) translateY(140%);background:var(--ink);color:#fff;padding:14px 22px;border-radius:14px;font-size:18px;z-index:30;transition:transform .25s;max-width:90vw;text-align:center}
+  #toast.on{transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div class="snow" id="snow"></div>
+
+<!-- SPLASH -->
+<section class="screen on" id="splash">
+  <div style="font-weight:700;color:#f0ac3e;font-size:clamp(18px,2.4vw,28px);letter-spacing:.08em;margin-bottom:6px">4TH ANNUAL</div>
+  <h1>The Wiegman<br>Ugly Sweater Party</h1>
+  <p>Strike a pose, flaunt the sweater, and send the pic straight to your phone.</p>
+  <button class="big" id="startBtn">🎄 Start Photo Booth</button>
+  <div class="err" id="err"></div>
+</section>
+
+<!-- HOME / CAPTURE -->
+<section class="screen" id="home">
+  <div class="topbar">
+    <div class="brand">Say “Fruitcake!”</div>
+    <div class="icons">
+      <button class="ic" id="galBtn" aria-label="Gallery">🖼️<span class="badge" id="badge" hidden>0</span></button>
+      <button class="ic" id="fsBtn" aria-label="Full screen">⛶</button>
+      <button class="ic" id="gear" aria-label="Settings (hold)">⚙️<span class="ring"></span></button>
+    </div>
+  </div>
+  <div class="stage"><canvas id="preview" width="960" height="720"></canvas></div>
+  <div class="controls">
+    <div class="row" id="themes"></div>
+    <div class="row" style="align-items:center;gap:18px">
+      <div class="seg" id="modeSeg">
+        <button data-mode="single" class="sel">📸 Single</button>
+        <button data-mode="grid">🎞️ 4-Pack</button>
+      </div>
+      <button class="big" id="shootBtn">Tap to Start!</button>
+    </div>
+  </div>
+</section>
+
+<!-- RESULT -->
+<section class="screen" id="result">
+  <h2>Looking festive!</h2>
+  <img id="resultImg" alt="Your photo">
+  <div class="btns">
+    <button class="btn primary" id="shareBtn">📲 Text · Email · AirDrop</button>
+    <button class="btn ghost" id="againBtn">↺ Take Another</button>
+  </div>
+  <div class="hint">Saved to the party gallery ✔︎ · Returns to the camera automatically</div>
+</section>
+
+<!-- GALLERY -->
+<section class="screen" id="gallery">
+  <div class="topbar">
+    <h2>Party Gallery <span id="galCount" style="font-family:Fredoka;font-size:20px;opacity:.7"></span></h2>
+    <div class="icons">
+      <button class="btn ghost" id="shareAllBtn" style="font-size:17px;padding:14px 20px">⬆︎ Save / Share All</button>
+      <button class="ic" id="galClose" aria-label="Close">✕</button>
+    </div>
+  </div>
+  <div id="grid"></div>
+</section>
+
+<!-- VIEWER -->
+<div class="modal" id="viewer">
+  <img id="viewImg" alt="">
+  <div class="btns">
+    <button class="btn primary" id="viewShare">📲 Text · Email · Save</button>
+    <button class="btn ghost" id="viewDelete">🗑 Delete</button>
+    <button class="btn ghost" id="viewClose">Close</button>
+  </div>
+</div>
+
+<!-- CONFIRM -->
+<div class="modal" id="confirm">
+  <div class="card">
+    <h3 id="confirmMsg">Are you sure?</h3>
+    <div class="btns">
+      <button class="btn dark" id="confirmNo">Cancel</button>
+      <button class="btn danger" id="confirmYes">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div class="modal" id="settings">
+  <div class="card">
+    <h3>Booth Settings</h3>
+    <label for="sKicker">Top line</label>
+    <input type="text" id="sKicker" maxlength="30">
+    <label for="sCaption">Caption</label>
+    <input type="text" id="sCaption" maxlength="40">
+    <label for="sSub">Sub-caption</label>
+    <input type="text" id="sSub" maxlength="60">
+    <label>Countdown (seconds)</label>
+    <div class="slider"><input type="range" id="sTimerR" min="1" max="10" step="1"><input type="number" id="sTimerN" min="1" max="10" step="1" inputmode="numeric"></div>
+    <label>Pause between 4-Pack shots (seconds)</label>
+    <div class="slider"><input type="range" id="sGapR" min="1" max="10" step="1"><input type="number" id="sGapN" min="1" max="10" step="1" inputmode="numeric"></div>
+    <label>Auto-return to camera after (seconds)</label>
+    <div class="slider"><input type="range" id="sIdleR" min="10" max="180" step="5"><input type="number" id="sIdleN" min="10" max="180" step="5" inputmode="numeric"></div>
+    <label class="check"><input type="checkbox" id="sMirror"> Save photos mirrored (like the preview)</label>
+    <div class="small">Off = sweater text reads the right way in saved photos.</div>
+    <label class="check"><input type="checkbox" id="sSound"> Countdown beeps &amp; shutter sound</label>
+    <div class="btns">
+      <button class="btn danger" id="clearAll">Clear Gallery</button>
+      <button class="btn dark" id="sDone">Done</button>
+    </div>
+    <div class="small">Photos are stored only on this iPad, inside this web page. At the end of the night open the Gallery → “Save / Share All” → “Save Images” to put them in your Photos library.</div>
+  </div>
+</div>
+
+<div id="overlay"><div id="count"></div></div>
+<div id="shotlabel"></div>
+<div id="flash"></div>
+<div id="toast"></div>
+<video id="video" playsinline muted autoplay style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none"></video>
+
+<script>
+(() => {
+'use strict';
+const $ = s => document.querySelector(s);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const video = $('#video');
+const preview = $('#preview');
+const pctx = preview.getContext('2d');
+const OUT_W = 1800, OUT_H = 1350;
+
+/* ---------- settings ---------- */
+const DEFAULTS = {
+  kicker: '4th Annual',
+  caption: 'The Wiegman Ugly Sweater Party',
+  sub: 'Saturday, December 5, 2026',
+  timer: 3, gap: 2, idle: 60, mirror: false, sound: true, theme: 'wiegman', mode: 'single'
+};
+function loadSettings() {
+  try { return Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem('pb-settings-v2') || '{}')); }
+  catch (e) { return Object.assign({}, DEFAULTS); }
+}
+function saveSettings() { try { localStorage.setItem('pb-settings-v2', JSON.stringify(S)); } catch (e) {} }
+const S = loadSettings();
+
+const state = { busy: false, shots: [], n: 1, screen: 'splash', lastBlob: null, viewing: null, idleT: null };
+
+/* ---------- tiny IndexedDB store ---------- */
+let dbP = null;
+function db() {
+  if (dbP) return dbP;
+  dbP = new Promise((res, rej) => {
+    try {
+      const r = indexedDB.open('photobooth', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('photos', { keyPath: 'id', autoIncrement: true });
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    } catch (e) { rej(e); }
+  });
+  return dbP;
+}
+const memStore = []; // fallback if IndexedDB is unavailable
+async function dbAdd(blob) {
+  const rec = { blob, ts: Date.now() };
+  try {
+    const d = await db();
+    return await new Promise((res, rej) => {
+      const t = d.transaction('photos', 'readwrite');
+      const q = t.objectStore('photos').add(rec);
+      q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error);
+    });
+  } catch (e) { rec.id = memStore.length + 1; memStore.push(rec); return rec.id; }
+}
+async function dbAll() {
+  try {
+    const d = await db();
+    return await new Promise((res, rej) => {
+      const q = d.transaction('photos').objectStore('photos').getAll();
+      q.onsuccess = () => res(q.result.concat(memStore)); q.onerror = () => rej(q.error);
+    });
+  } catch (e) { return memStore.slice(); }
+}
+async function dbDel(id) {
+  const i = memStore.findIndex(r => r.id === id); if (i >= 0) { memStore.splice(i, 1); return; }
+  try {
+    const d = await db();
+    await new Promise((res) => { const t = d.transaction('photos', 'readwrite'); t.objectStore('photos').delete(id); t.oncomplete = res; t.onerror = res; });
+  } catch (e) {}
+}
+async function dbClear() {
+  memStore.length = 0;
+  try {
+    const d = await db();
+    await new Promise((res) => { const t = d.transaction('photos', 'readwrite'); t.objectStore('photos').clear(); t.oncomplete = res; t.onerror = res; });
+  } catch (e) {}
+}
+async function refreshBadge() {
+  const all = await dbAll();
+  const b = $('#badge'); b.textContent = all.length; b.hidden = all.length === 0;
+}
+
+/* ---------- drawing ---------- */
+function rng(seed) { return () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }; }
+
+function drawCover(ctx, src, x, y, w, h, mirror) {
+  const sw = src && (src.videoWidth || src.width), sh = src && (src.videoHeight || src.height);
+  ctx.save();
+  ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+  if (!sw || !sh) {
+    ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(x, y, w, h);
+  } else {
+    const s = Math.max(w / sw, h / sh), cw = w / s, ch = h / s, sx = (sw - cw) / 2, sy = (sh - ch) / 2;
+    if (mirror) { ctx.translate(x + w, y); ctx.scale(-1, 1); ctx.drawImage(src, sx, sy, cw, ch, 0, 0, w, h); }
+    else ctx.drawImage(src, sx, sy, cw, ch, x, y, w, h);
+  }
+  ctx.restore();
+}
+
+const SNOWFLAKE = ['#..#..#', '.#.#.#.', '..###..', '#######', '..###..', '.#.#.#.', '#..#..#'];
+const TREE      = ['...#...', '..###..', '.#####.', '..###..', '.#####.', '#######', '...#...'];
+const knitCache = {};
+function knitTiles(cell) {
+  if (knitCache[cell]) return knitCache[cell];
+  const cols = 20, rows = 9;
+  const h = document.createElement('canvas'); h.width = cols * cell; h.height = rows * cell;
+  const c = h.getContext('2d');
+  c.fillStyle = '#a8102a'; c.fillRect(0, 0, h.width, h.height);
+  const px = (x, y, col) => { c.fillStyle = col; c.fillRect(x * cell + .5, y * cell + .5, cell - 1, cell - 1); };
+  for (let x = 0; x < cols; x++) { if (x % 2 === 0) { px(x, 0, '#fff8ec'); px(x, rows - 1, '#fff8ec'); } }
+  for (let y = 0; y < 7; y++) for (let x = 0; x < 7; x++) {
+    if (SNOWFLAKE[y][x] === '#') px(x + 1, y + 1, '#fff8ec');
+    if (TREE[y][x] === '#') px(x + 11, y + 1, y === 6 ? '#6b3b1f' : '#2fa35a');
+  }
+  const v = document.createElement('canvas'); v.width = h.height; v.height = h.width;
+  const vc = v.getContext('2d'); vc.translate(v.width, 0); vc.rotate(Math.PI / 2); vc.drawImage(h, 0, 0);
+  return (knitCache[cell] = { h, v, band: rows * cell });
+}
+
+function fitFont(ctx, text, weightFamily, size, maxW) {
+  let s = size;
+  ctx.font = `${weightFamily.replace('{s}', s)}`;
+  while (ctx.measureText(text).width > maxW && s > 8) { s -= 2; ctx.font = weightFamily.replace('{s}', s); }
+  return s;
+}
+function drawCaption(ctx, x, y, w, h, color, subColor, shadow, o) {
+  o = o || {};
+  const mainFont = o.font || '700 {s}px "Mountains of Christmas", Georgia, serif';
+  ctx.save();
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const cx = x + w / 2;
+  const hasSub = !!(S.sub && S.sub.trim()), hasKick = !!(S.kicker && S.kicker.trim());
+  let kY, mY, mS, sY;
+  if (hasKick && hasSub) { kY = .17; mY = .50; mS = .40; sY = .84; }
+  else if (hasKick) { kY = .22; mY = .62; mS = .48; }
+  else if (hasSub) { mY = .40; mS = .56; sY = .80; }
+  else { mY = .52; mS = .66; }
+  if (hasKick) {
+    fitFont(ctx, S.kicker.toUpperCase(), '700 {s}px Fredoka, system-ui, sans-serif', Math.round(h * .15), w * .9);
+    ctx.fillStyle = o.kickerColor || subColor; ctx.fillText(S.kicker.toUpperCase(), cx, y + h * kY);
+  }
+  fitFont(ctx, S.caption, mainFont, Math.round(h * mS), w * .94);
+  if (shadow) { ctx.fillStyle = shadow; ctx.fillText(S.caption, cx, y + h * mY + h * .03); }
+  ctx.fillStyle = color; ctx.fillText(S.caption, cx, y + h * mY);
+  if (hasSub) {
+    fitFont(ctx, S.sub, '600 {s}px Fredoka, system-ui, sans-serif', Math.round(h * (hasKick ? .15 : .2)), w * .9);
+    ctx.fillStyle = subColor; ctx.fillText(S.sub, cx, y + h * sY);
+  }
+  ctx.restore();
+}
+
+function star(ctx, x, y, r, rot) {
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = rot + i * Math.PI / 5, rr = i % 2 ? r * .45 : r;
+    ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+  }
+  ctx.closePath(); ctx.fill();
+}
+function stringLights(ctx, W, H, b) {
+  const ins = b * .42, x0 = ins, y0 = ins, x1 = W - ins, y1 = H - ins;
+  const segs = [[x0, y0, x1, y0, 0, 1], [x1, y0, x1, y1, -1, 0], [x1, y1, x0, y1, 0, -1], [x0, y1, x0, y0, 1, 0]];
+  const L = 2 * (x1 - x0) + 2 * (y1 - y0), per = b * 1.6, amp = b * .16;
+  const at = t => {
+    let d = t;
+    for (const [ax, ay, bx, by, nx, ny] of segs) {
+      const len = Math.hypot(bx - ax, by - ay);
+      if (d <= len) { const f = d / len; return { x: ax + (bx - ax) * f, y: ay + (by - ay) * f, nx, ny }; }
+      d -= len;
+    }
+    return { x: x0, y: y0, nx: 0, ny: 1 };
+  };
+  ctx.save();
+  ctx.strokeStyle = '#050806'; ctx.lineWidth = Math.max(2, b * .06); ctx.lineJoin = 'round';
+  ctx.beginPath();
+  for (let t = 0; t <= L; t += 4) { const p = at(t), off = Math.sin(t / per * Math.PI * 2) * amp; ctx.lineTo(p.x + p.nx * off, p.y + p.ny * off); }
+  ctx.closePath(); ctx.stroke();
+  const cols = ['#e8502f', '#f0ac3e', '#f4ead2', '#e8502f', '#f0ac3e'];
+  let k = 0;
+  for (let t = per * .25; t < L; t += per / 2, k++) {
+    const p = at(t), off = Math.sin(t / per * Math.PI * 2) * amp;
+    const bx = p.x + p.nx * off, by = p.y + p.ny * off;
+    const dir = (k % 2 ? 1 : -1);               // hang alternately in/out
+    const ang = Math.atan2(p.ny * dir, p.nx * dir);
+    ctx.save(); ctx.translate(bx, by); ctx.rotate(ang);
+    ctx.fillStyle = '#2a2a24'; ctx.fillRect(0, -b * .06, b * .1, b * .12);
+    const col = cols[k % cols.length];
+    ctx.shadowColor = col; ctx.shadowBlur = b * .35;
+    ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(b * .22, 0, b * .14, b * .09, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+const THEMES = {
+  wiegman: {
+    name: '🎅 Wiegman Party',
+    frame(ctx, W, H, b, cap) {
+      ctx.fillStyle = '#16231a'; ctx.fillRect(0, 0, W, H);
+      const r = rng(7);
+      ctx.fillStyle = '#f0ac3e';
+      for (let i = 0; i < 26; i++) {
+        const edge = r(); let x, y;
+        if (edge < .5) { x = r() * W; y = r() < .5 ? r() * b : H - r() * b; } else { y = r() * H; x = r() < .5 ? r() * b : W - r() * b; }
+        star(ctx, x, y, b * (.08 + r() * .1), r() * 6);
+      }
+      ctx.fillStyle = '#16231a'; ctx.fillRect(cap.x, cap.y, cap.w, cap.h);
+      drawCaption(ctx, cap.x, cap.y, cap.w, cap.h, '#e8502f', '#f0ac3e', 'rgba(0,0,0,.45)',
+        { font: '400 {s}px "Kaushan Script", "Brush Script MT", cursive', kickerColor: '#f0ac3e' });
+      stringLights(ctx, W, H, b);
+    },
+    keyline: '#f0ac3e'
+  },
+  sweater: {
+    name: '🧶 Ugly Sweater',
+    frame(ctx, W, H, b, cap) {
+      ctx.fillStyle = '#a8102a'; ctx.fillRect(0, 0, W, H);
+      const cell = Math.max(2, Math.floor(b / 9)); const t = knitTiles(cell);
+      const ph = ctx.createPattern(t.h, 'repeat-x'), pv = ctx.createPattern(t.v, 'repeat-y');
+      const off = Math.floor((b - t.band) / 2);
+      ctx.save(); ctx.translate(off, 0); ctx.fillStyle = pv; ctx.fillRect(0, 0, t.band, H); ctx.restore();
+      ctx.save(); ctx.translate(W - b + off, 0); ctx.fillStyle = pv; ctx.fillRect(0, 0, t.band, H); ctx.restore();
+      ctx.fillStyle = '#a8102a'; ctx.fillRect(0, 0, W, b); ctx.fillRect(0, H - b, W, b);
+      ctx.save(); ctx.translate(0, off); ctx.fillStyle = ph; ctx.fillRect(0, 0, W, t.band); ctx.restore();
+      ctx.save(); ctx.translate(0, H - b + off); ctx.fillStyle = ph; ctx.fillRect(0, 0, W, t.band); ctx.restore();
+      // caption panel
+      ctx.fillStyle = '#155c33'; ctx.fillRect(cap.x, cap.y, cap.w, cap.h);
+      ctx.save(); ctx.strokeStyle = '#fff8ec'; ctx.lineWidth = Math.max(2, cell * .5); ctx.setLineDash([cell * 1.4, cell]);
+      ctx.strokeRect(cap.x + cell, cap.y + cell, cap.w - cell * 2, cap.h - cell * 2); ctx.restore();
+      drawCaption(ctx, cap.x, cap.y, cap.w, cap.h, '#fff8ec', '#f2c14e', '#8f0b20');
+    },
+    keyline: '#fff8ec'
+  },
+  candy: {
+    name: '🍬 Candy Cane',
+    frame(ctx, W, H, b, cap) {
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
+      const s = Math.round(b * .55);
+      ctx.fillStyle = '#d0142f';
+      for (let i = -H; i < W + H; i += s * 2) {
+        ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i + s, 0); ctx.lineTo(i + s + H, H); ctx.lineTo(i + H, H); ctx.closePath(); ctx.fill();
+      }
+      ctx.fillStyle = '#fffdf7'; ctx.fillRect(cap.x, cap.y, cap.w, cap.h);
+      drawCaption(ctx, cap.x, cap.y, cap.w, cap.h, '#c8102e', '#1b6b3a', null);
+    },
+    keyline: '#ffffff'
+  },
+  snow: {
+    name: '❄️ Snow Day',
+    frame(ctx, W, H, b, cap) {
+      const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#0f2350'); g.addColorStop(1, '#2a4a8a');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      const r = rng(42);
+      for (let i = 0; i < 260; i++) {
+        const x = r() * W, y = r() * H, rad = (r() * 2.2 + .6) * W / 900;
+        ctx.globalAlpha = .35 + r() * .6; ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(x, y, rad, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      drawCaption(ctx, cap.x, cap.y, cap.w, cap.h, '#ffffff', '#bcd6ff', 'rgba(0,0,0,.35)');
+    },
+    keyline: '#ffffff'
+  },
+  classic: {
+    name: '📷 Classic',
+    frame(ctx, W, H, b, cap) {
+      ctx.fillStyle = '#fbf7ef'; ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#c8102e'; ctx.fillRect(0, 0, W, Math.max(3, b * .12));
+      ctx.fillStyle = '#1b6b3a'; ctx.fillRect(0, H - Math.max(3, b * .12), W, Math.max(3, b * .12));
+      drawCaption(ctx, cap.x, cap.y, cap.w, cap.h, '#1d1a17', '#c8102e', null);
+    },
+    keyline: null
+  }
+};
+
+function compose(ctx, W, H, slots, mirror, mode) {
+  const b = Math.round(W * .055), capH = Math.round(H * .18);
+  const area = { x: b, y: b, w: W - 2 * b, h: H - 2 * b - capH };
+  const cap = { x: b, y: b + area.h, w: area.w, h: capH };
+  const th = THEMES[S.theme] || THEMES.sweater;
+  th.frame(ctx, W, H, b, cap);
+  const rects = [];
+  if (mode === 'grid') {
+    const g = Math.round(W * .012), cw = (area.w - g) / 2, ch = (area.h - g) / 2;
+    for (let i = 0; i < 4; i++) rects.push({ x: area.x + (i % 2) * (cw + g), y: area.y + Math.floor(i / 2) * (ch + g), w: cw, h: ch });
+  } else rects.push(area);
+  rects.forEach((r, i) => {
+    const src = slots[i];
+    drawCover(ctx, src, r.x, r.y, r.w, r.h, mirror);
+    if (!src) {
+      ctx.save(); ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = `700 ${Math.round(r.h * .35)}px Fredoka, sans-serif`; ctx.fillText(String(i + 1), r.x + r.w / 2, r.y + r.h / 2); ctx.restore();
+    }
+    if (th.keyline) { ctx.save(); ctx.strokeStyle = th.keyline; ctx.lineWidth = Math.max(2, W * .003); ctx.strokeRect(r.x, r.y, r.w, r.h); ctx.restore(); }
+  });
+}
+
+/* ---------- live preview ---------- */
+function liveSlots() {
+  const n = S.mode === 'grid' ? 4 : 1;
+  if (!state.busy) return Array(n).fill(video);
+  return Array.from({ length: n }, (_, i) => i < state.shots.length ? state.shots[i] : (i === state.shots.length ? video : null));
+}
+function loop() {
+  if (state.screen === 'home' && video.readyState >= 2) compose(pctx, preview.width, preview.height, liveSlots(), true, S.mode);
+  requestAnimationFrame(loop);
+}
+function sizePreview() {
+  const stage = document.querySelector('#home .stage');
+  const r = stage.getBoundingClientRect();
+  const w = Math.min(r.width * .98, r.height * 4 / 3);
+  preview.style.width = Math.floor(w) + 'px';
+  preview.style.height = Math.floor(w * .75) + 'px';
+}
+addEventListener('resize', sizePreview);
+addEventListener('orientationchange', () => setTimeout(sizePreview, 300));
+
+/* ---------- camera ---------- */
+async function startCamera() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    throw new Error('insecure');
+  }
+  if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
+  const stream = await navigator.mediaDevices.getUserMedia({
+    audio: false,
+    video: { facingMode: 'user', width: { ideal: 1920 }, height: { ideal: 1440 } }
+  });
+  video.srcObject = stream;
+  await video.play().catch(() => {});
+}
+function cameraAlive() {
+  const s = video.srcObject; return s && s.getVideoTracks().some(t => t.readyState === 'live');
+}
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState === 'visible') {
+    requestWake();
+    if (state.screen !== 'splash' && !cameraAlive()) { try { await startCamera(); } catch (e) {} }
+  }
+});
+
+/* ---------- wake lock / fullscreen ---------- */
+let wake = null;
+async function requestWake() { try { if ('wakeLock' in navigator && !wake) { wake = await navigator.wakeLock.request('screen'); wake.addEventListener('release', () => { wake = null; }); } } catch (e) {} }
+function goFullscreen() {
+  const el = document.documentElement;
+  try { (el.requestFullscreen || el.webkitRequestFullscreen || function () {}).call(el); } catch (e) {}
+}
+function toggleFullscreen() {
+  const fs = document.fullscreenElement || document.webkitFullscreenElement;
+  if (fs) { try { (document.exitFullscreen || document.webkitExitFullscreen).call(document); } catch (e) {} }
+  else goFullscreen();
+  setTimeout(sizePreview, 400);
+}
+
+/* ---------- sound ---------- */
+let ac = null;
+function unlockAudio() { try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); ac.resume(); } catch (e) {} }
+function tone(f, d = .14, vol = .22, when = 0, type = 'sine') {
+  if (!ac || !S.sound) return;
+  const t0 = ac.currentTime + when, o = ac.createOscillator(), g = ac.createGain();
+  o.type = type; o.frequency.value = f;
+  g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(.001, t0 + d);
+  o.connect(g).connect(ac.destination); o.start(t0); o.stop(t0 + d + .02);
+}
+function shutterSound() {
+  if (!ac || !S.sound) return;
+  const len = Math.floor(ac.sampleRate * .09), buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2);
+  const s = ac.createBufferSource(), g = ac.createGain(); g.gain.value = .5;
+  s.buffer = buf; s.connect(g).connect(ac.destination); s.start();
+}
+function jingle() { [1046, 1318, 1568, 2093].forEach((f, i) => tone(f, .25, .16, i * .09, 'triangle')); }
+
+/* ---------- capture flow ---------- */
+function grab() {
+  const c = document.createElement('canvas');
+  c.width = video.videoWidth; c.height = video.videoHeight;
+  c.getContext('2d').drawImage(video, 0, 0);
+  return c;
+}
+async function countdown(n) {
+  const el = $('#count');
+  for (let i = n; i > 0; i--) {
+    el.textContent = i; el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
+    tone(i === 1 ? 1320 : 880);
+    await sleep(1000);
+  }
+  el.classList.remove('pop'); el.textContent = '';
+}
+function flash() { const f = $('#flash'); f.classList.remove('go'); void f.offsetWidth; f.classList.add('go'); }
+
+async function shoot() {
+  if (state.busy) return;
+  if (!cameraAlive()) { try { await startCamera(); } catch (e) { toast('Camera not available'); return; } }
+  unlockAudio(); requestWake();
+  state.busy = true; state.shots = [];
+  state.n = S.mode === 'grid' ? 4 : 1;
+  document.body.classList.add('capturing');
+  const label = $('#shotlabel');
+  try {
+    for (let i = 0; i < state.n; i++) {
+      label.textContent = state.n > 1 ? `Photo ${i + 1} of ${state.n}` : 'Get ready!';
+      await countdown(i === 0 ? S.timer : S.gap);
+      flash(); shutterSound();
+      state.shots.push(grab());
+      await sleep(i < state.n - 1 ? 700 : 350);
+    }
+    label.textContent = 'Wrapping it up…';
+    try { await document.fonts.ready; } catch (e) {}
+    const out = document.createElement('canvas'); out.width = OUT_W; out.height = OUT_H;
+    compose(out.getContext('2d'), OUT_W, OUT_H, state.shots, S.mirror, S.mode);
+    const blob = await new Promise(r => out.toBlob(r, 'image/jpeg', .9));
+    state.lastBlob = blob;
+    await dbAdd(blob); refreshBadge();
+    jingle();
+    showResult(blob);
+  } catch (e) {
+    console.error(e); toast('Something went wrong — try again');
+  } finally {
+    state.busy = false; state.shots = [];
+    document.body.classList.remove('capturing');
+  }
+}
+
+/* ---------- screens ---------- */
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id));
+  state.screen = id;
+  if (id === 'home') requestAnimationFrame(sizePreview);
+  clearTimeout(state.idleT);
+  if (id === 'result' || id === 'gallery') armIdle();
+}
+function armIdle() {
+  clearTimeout(state.idleT);
+  state.idleT = setTimeout(() => {
+    if ($('#settings').classList.contains('on') || $('#confirm').classList.contains('on')) { armIdle(); return; }
+    $('#viewer').classList.remove('on'); show('home');
+  }, S.idle * 1000);
+}
+['pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, () => { if (state.screen === 'result' || state.screen === 'gallery') armIdle(); }, true));
+
+let resultURL = null;
+function showResult(blob) {
+  if (resultURL) URL.revokeObjectURL(resultURL);
+  resultURL = URL.createObjectURL(blob);
+  $('#resultImg').src = resultURL;
+  show('result');
+}
+
+function fileName(ts) {
+  const d = new Date(ts || Date.now());
+  const p = n => String(n).padStart(2, '0');
+  return `ugly-sweater-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.jpg`;
+}
+async function shareBlobs(items) {
+  const files = items.map(it => new File([it.blob], fileName(it.ts), { type: 'image/jpeg' }));
+  if (navigator.canShare && navigator.share && navigator.canShare({ files })) {
+    try { await navigator.share({ files }); }
+    catch (e) { if (e.name !== 'AbortError') toast('Sharing didn’t work — try again'); }
+  } else {
+    items.forEach((it, i) => setTimeout(() => {
+      const a = document.createElement('a'); a.href = URL.createObjectURL(it.blob); a.download = fileName(it.ts);
+      document.body.appendChild(a); a.click(); a.remove();
+    }, i * 250));
+    toast('Sharing isn’t supported in this browser — downloading instead');
+  }
+}
+
+/* ---------- gallery ---------- */
+let thumbURLs = [];
+async function openGallery() {
+  thumbURLs.forEach(u => URL.revokeObjectURL(u)); thumbURLs = [];
+  const all = (await dbAll()).sort((a, b) => b.ts - a.ts);
+  const grid = $('#grid'); grid.innerHTML = '';
+  $('#galCount').textContent = all.length ? `(${all.length})` : '';
+  if (!all.length) grid.innerHTML = '<div class="empty">No photos yet — go make some memories! 🎅</div>';
+  all.forEach(rec => {
+    const u = URL.createObjectURL(rec.blob); thumbURLs.push(u);
+    const img = document.createElement('img'); img.src = u; img.loading = 'lazy'; img.alt = 'Party photo';
+    img.addEventListener('click', () => openViewer(rec, u));
+    grid.appendChild(img);
+  });
+  state.galleryAll = all;
+  show('gallery');
+}
+function openViewer(rec, url) { state.viewing = rec; $('#viewImg').src = url; $('#viewer').classList.add('on'); }
+
+function confirmBox(msg, yesLabel) {
+  return new Promise(res => {
+    $('#confirmMsg').textContent = msg; $('#confirmYes').textContent = yesLabel || 'Delete';
+    const m = $('#confirm'); m.classList.add('on');
+    const done = v => { m.classList.remove('on'); $('#confirmYes').onclick = $('#confirmNo').onclick = null; res(v); };
+    $('#confirmYes').onclick = () => done(true); $('#confirmNo').onclick = () => done(false);
+  });
+}
+
+/* ---------- settings ---------- */
+function bindSlider(rId, nId, key) {
+  const r = $(rId), n = $(nId);
+  r.value = n.value = S[key];
+  r.addEventListener('input', () => { n.value = r.value; S[key] = +r.value; saveSettings(); });
+  n.addEventListener('input', () => {
+    const v = +n.value; if (!n.value || isNaN(v)) return;
+    const c = Math.min(+n.max, Math.max(+n.min, v)); r.value = c; S[key] = c; saveSettings();
+  });
+  n.addEventListener('change', () => { n.value = S[key]; });
+}
+function openSettings() {
+  $('#sKicker').value = S.kicker; $('#sCaption').value = S.caption; $('#sSub').value = S.sub;
+  $('#sMirror').checked = S.mirror; $('#sSound').checked = S.sound;
+  ['#sTimer', '#sGap', '#sIdle'].forEach((p, i) => { const k = ['timer', 'gap', 'idle'][i]; $(p + 'R').value = $(p + 'N').value = S[k]; });
+  $('#settings').classList.add('on');
+}
+bindSlider('#sTimerR', '#sTimerN', 'timer');
+bindSlider('#sGapR', '#sGapN', 'gap');
+bindSlider('#sIdleR', '#sIdleN', 'idle');
+$('#sKicker').addEventListener('input', e => { S.kicker = e.target.value; saveSettings(); });
+$('#sCaption').addEventListener('input', e => { S.caption = e.target.value; saveSettings(); });
+$('#sSub').addEventListener('input', e => { S.sub = e.target.value; saveSettings(); });
+$('#sMirror').addEventListener('change', e => { S.mirror = e.target.checked; saveSettings(); });
+$('#sSound').addEventListener('change', e => { S.sound = e.target.checked; saveSettings(); });
+$('#sDone').addEventListener('click', () => $('#settings').classList.remove('on'));
+$('#clearAll').addEventListener('click', async () => {
+  if (await confirmBox('Delete every photo in the gallery? This can’t be undone.', 'Delete All')) {
+    await dbClear(); refreshBadge(); toast('Gallery cleared');
+  }
+});
+
+// hold-to-open gear so guests don't wander in
+(() => {
+  const g = $('#gear'); let t = null;
+  const cancel = () => { clearTimeout(t); g.classList.remove('holding'); };
+  g.addEventListener('pointerdown', e => { e.preventDefault(); g.classList.add('holding'); t = setTimeout(() => { cancel(); openSettings(); }, 1000); });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => g.addEventListener(ev, cancel));
+  g.addEventListener('click', () => { if (!$('#settings').classList.contains('on')) toast('Hold the gear for 1 second to open settings'); });
+})();
+
+/* ---------- UI wiring ---------- */
+function buildThemes() {
+  const row = $('#themes'); row.innerHTML = '';
+  Object.entries(THEMES).forEach(([k, t]) => {
+    const b = document.createElement('button'); b.className = 'chip' + (S.theme === k ? ' sel' : ''); b.textContent = t.name;
+    b.addEventListener('click', () => { S.theme = k; saveSettings(); buildThemes(); });
+    row.appendChild(b);
+  });
+}
+function syncMode() { document.querySelectorAll('#modeSeg button').forEach(b => b.classList.toggle('sel', b.dataset.mode === S.mode)); }
+document.querySelectorAll('#modeSeg button').forEach(b => b.addEventListener('click', () => { if (state.busy) return; S.mode = b.dataset.mode; saveSettings(); syncMode(); }));
+
+$('#startBtn').addEventListener('click', async () => {
+  unlockAudio(); goFullscreen(); requestWake();
+  const err = $('#err'); err.style.display = 'none';
+  try {
+    await startCamera();
+    show('home'); refreshBadge();
+  } catch (e) {
+    err.style.display = 'block';
+    if (e.message === 'insecure') err.innerHTML = '<b>Camera unavailable here.</b> This page has to be opened from an <b>https://</b> web address in Safari (not opened as a file, and not inside another app’s preview).';
+    else if (e.name === 'NotAllowedError') err.innerHTML = '<b>Camera permission was blocked.</b> On iPad: Settings → Apps → Safari → Camera → Allow (or tap “aA” in the address bar → Website Settings → Camera → Allow), then reload.';
+    else err.innerHTML = '<b>Couldn’t start the camera.</b> Close other apps using the camera and try again. (' + (e.name || e.message) + ')';
+  }
+});
+$('#shootBtn').addEventListener('click', shoot);
+$('#againBtn').addEventListener('click', () => show('home'));
+$('#shareBtn').addEventListener('click', () => { if (state.lastBlob) shareBlobs([{ blob: state.lastBlob, ts: Date.now() }]); });
+$('#galBtn').addEventListener('click', openGallery);
+$('#galClose').addEventListener('click', () => show('home'));
+$('#fsBtn').addEventListener('click', toggleFullscreen);
+$('#shareAllBtn').addEventListener('click', () => {
+  const all = state.galleryAll || [];
+  if (!all.length) { toast('No photos yet'); return; }
+  shareBlobs(all);
+});
+$('#viewClose').addEventListener('click', () => $('#viewer').classList.remove('on'));
+$('#viewShare').addEventListener('click', () => { if (state.viewing) shareBlobs([state.viewing]); });
+$('#viewDelete').addEventListener('click', async () => {
+  if (!state.viewing) return;
+  if (await confirmBox('Delete this photo?')) {
+    await dbDel(state.viewing.id); $('#viewer').classList.remove('on'); refreshBadge(); openGallery();
+  }
+});
+
+let toastT;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 3200); }
+
+/* snow + icon */
+(() => {
+  const s = $('#snow');
+  for (let i = 0; i < 28; i++) {
+    const f = document.createElement('i'); const sz = 4 + Math.random() * 7;
+    f.style.cssText = `left:${Math.random() * 100}%;width:${sz}px;height:${sz}px;animation-duration:${8 + Math.random() * 10}s;animation-delay:${-Math.random() * 18}s;opacity:${.25 + Math.random() * .5}`;
+    s.appendChild(f);
+  }
+  try {
+    const c = document.createElement('canvas'); c.width = c.height = 180; const x = c.getContext('2d');
+    x.fillStyle = '#a8102a'; x.fillRect(0, 0, 180, 180);
+    const t = knitTiles(9); x.fillStyle = x.createPattern(t.h, 'repeat'); x.fillRect(0, 0, 180, 81); x.fillRect(0, 99, 180, 81);
+    x.font = '80px serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('📸', 90, 92);
+    $('#touchIcon').href = c.toDataURL('image/png');
+  } catch (e) {}
+})();
+
+try { ['400 40px "Kaushan Script"', '700 40px "Mountains of Christmas"', '600 40px Fredoka', '700 40px Fredoka'].forEach(f => document.fonts.load(f)); } catch (e) {}
+buildThemes(); syncMode(); refreshBadge(); loop();
+})();
+</script>
+</body>
+</html>
