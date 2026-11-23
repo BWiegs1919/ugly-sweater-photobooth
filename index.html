@@ -54,7 +54,7 @@
   .chip{background:rgba(255,255,255,.12);color:#fff;padding:12px 20px;border-radius:999px;font-size:clamp(16px,1.8vw,20px);font-weight:600;border:2px solid transparent}
   .chip.sel{background:var(--cream);color:var(--ink);border-color:var(--gold)}
   .seg{display:flex;background:rgba(0,0,0,.3);border-radius:999px;padding:5px}
-  .seg button{background:transparent;color:#fff;padding:10px 22px;border-radius:999px;font-size:clamp(16px,1.8vw,20px);font-weight:600}
+  .seg button{background:transparent;color:#fff;padding:10px 16px;border-radius:999px;font-size:clamp(16px,1.8vw,20px);font-weight:600}
   .seg button.sel{background:var(--green);box-shadow:inset 0 0 0 2px #2f9a58}
   body.capturing .controls,body.capturing .topbar .icons{visibility:hidden}
 
@@ -84,7 +84,7 @@
   #gallery{justify-content:flex-start;gap:14px}
   #gallery .topbar h2{margin:0;font-family:"Mountains of Christmas",Georgia,serif;font-size:clamp(32px,4vw,46px)}
   #grid{flex:1;width:100%;overflow-y:auto;-webkit-overflow-scrolling:touch;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;align-content:start;padding-bottom:20px}
-  #grid img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:10px;display:block;box-shadow:0 6px 18px rgba(0,0,0,.35)}
+  #grid img{width:100%;aspect-ratio:4/3;object-fit:contain;background:rgba(0,0,0,.25);border-radius:10px;display:block;box-shadow:0 6px 18px rgba(0,0,0,.35)}
   #grid .empty{grid-column:1/-1;text-align:center;opacity:.7;font-size:20px;padding:60px 0}
 
   /* modal */
@@ -140,7 +140,9 @@
     <div class="row" style="align-items:center;gap:18px">
       <div class="seg" id="modeSeg">
         <button data-mode="single" class="sel">📸 Single</button>
-        <button data-mode="grid">🎞️ 4-Pack</button>
+        <button data-mode="grid">🔲 4-Grid</button>
+        <button data-mode="strip">🎞️ Photo Strip</button>
+        <button data-mode="row">↔️ Side-by-Side</button>
       </div>
       <button class="big" id="shootBtn">Tap to Start!</button>
     </div>
@@ -203,7 +205,7 @@
     <input type="text" id="sSub" maxlength="60">
     <label>Countdown (seconds)</label>
     <div class="slider"><input type="range" id="sTimerR" min="1" max="10" step="1"><input type="number" id="sTimerN" min="1" max="10" step="1" inputmode="numeric"></div>
-    <label>Pause between 4-Pack shots (seconds)</label>
+    <label>Pause between shots in 4-photo modes (seconds)</label>
     <div class="slider"><input type="range" id="sGapR" min="1" max="10" step="1"><input type="number" id="sGapN" min="1" max="10" step="1" inputmode="numeric"></div>
     <label>Auto-return to camera after (seconds)</label>
     <div class="slider"><input type="range" id="sIdleR" min="10" max="180" step="5"><input type="number" id="sIdleN" min="10" max="180" step="5" inputmode="numeric"></div>
@@ -232,7 +234,6 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const video = $('#video');
 const preview = $('#preview');
 const pctx = preview.getContext('2d');
-const OUT_W = 1800, OUT_H = 1350;
 
 /* ---------- settings ---------- */
 const DEFAULTS = {
@@ -363,9 +364,29 @@ function drawCaption(ctx, x, y, w, h, color, subColor, shadow, o) {
     fitFont(ctx, S.kicker.toUpperCase(), '700 {s}px Fredoka, system-ui, sans-serif', Math.round(h * .15), w * .9);
     ctx.fillStyle = o.kickerColor || subColor; ctx.fillText(S.kicker.toUpperCase(), cx, y + h * kY);
   }
-  fitFont(ctx, S.caption, mainFont, Math.round(h * mS), w * .94);
-  if (shadow) { ctx.fillStyle = shadow; ctx.fillText(S.caption, cx, y + h * mY + h * .03); }
-  ctx.fillStyle = color; ctx.fillText(S.caption, cx, y + h * mY);
+  const target = Math.round(h * mS);
+  const got = fitFont(ctx, S.caption, mainFont, target, w * .94);
+  let lines = [S.caption];
+  if (got < target * .72 && S.caption.trim().includes(' ')) {
+    const words = S.caption.trim().split(/\s+/); let best = 1, bestD = 1e9;
+    for (let i = 1; i < words.length; i++) {
+      const d = Math.abs(words.slice(0, i).join(' ').length - words.slice(i).join(' ').length);
+      if (d < bestD) { bestD = d; best = i; }
+    }
+    lines = [words.slice(0, best).join(' '), words.slice(best).join(' ')];
+    const t2 = Math.round(target * .62);
+    const s2 = Math.min(fitFont(ctx, lines[0], mainFont, t2, w * .94), fitFont(ctx, lines[1], mainFont, t2, w * .94));
+    ctx.font = mainFont.replace('{s}', s2);
+    const lh = s2 * 1.02;
+    lines.forEach((ln, i) => {
+      const ly = y + h * mY + (i - .5) * lh;
+      if (shadow) { ctx.fillStyle = shadow; ctx.fillText(ln, cx, ly + h * .02); }
+      ctx.fillStyle = color; ctx.fillText(ln, cx, ly);
+    });
+  } else {
+    if (shadow) { ctx.fillStyle = shadow; ctx.fillText(S.caption, cx, y + h * mY + h * .03); }
+    ctx.fillStyle = color; ctx.fillText(S.caption, cx, y + h * mY);
+  }
   if (hasSub) {
     fitFont(ctx, S.sub, '600 {s}px Fredoka, system-ui, sans-serif', Math.round(h * (hasKick ? .15 : .2)), w * .9);
     ctx.fillStyle = subColor; ctx.fillText(S.sub, cx, y + h * sY);
@@ -497,17 +518,40 @@ const THEMES = {
   }
 };
 
-function compose(ctx, W, H, slots, mirror, mode) {
-  const b = Math.round(W * .055), capH = Math.round(H * .18);
-  const area = { x: b, y: b, w: W - 2 * b, h: H - 2 * b - capH };
-  const cap = { x: b, y: b + area.h, w: area.w, h: capH };
+// Layout for each mode at a given output width. Returns canvas height, border, caption and photo rects.
+function layoutFor(mode, W) {
+  let H, b, capH, rects = [];
+  if (mode === 'strip') {               // classic tall photo-booth strip: 4 photos stacked
+    b = Math.round(W * .07); const g = Math.round(W * .035);
+    const pw = W - 2 * b, ph = Math.round(pw * .75);
+    capH = Math.round(W * .5);
+    H = 2 * b + 4 * ph + 3 * g + capH;
+    for (let i = 0; i < 4; i++) rects.push({ x: b, y: b + i * (ph + g), w: pw, h: ph });
+  } else if (mode === 'row') {          // 4 photos left to right
+    b = Math.round(W * .028); const g = Math.round(W * .012);
+    const pw = (W - 2 * b - 3 * g) / 4, ph = Math.round(pw * .75);
+    capH = Math.round(ph * .62);
+    H = 2 * b + ph + capH;
+    for (let i = 0; i < 4; i++) rects.push({ x: b + i * (pw + g), y: b, w: pw, h: ph });
+  } else {                              // single or 2x2 grid, 4:3 card
+    H = Math.round(W * .75); b = Math.round(W * .055); capH = Math.round(H * .18);
+    const area = { x: b, y: b, w: W - 2 * b, h: H - 2 * b - capH };
+    if (mode === 'grid') {
+      const g = Math.round(W * .012), cw = (area.w - g) / 2, ch = (area.h - g) / 2;
+      for (let i = 0; i < 4; i++) rects.push({ x: area.x + (i % 2) * (cw + g), y: area.y + Math.floor(i / 2) * (ch + g), w: cw, h: ch });
+    } else rects.push(area);
+  }
+  const cap = { x: b, y: H - b - capH, w: W - 2 * b, h: capH };
+  return { W, H, b, cap, rects };
+}
+const OUT_WIDTH = { single: 1800, grid: 1800, strip: 1200, row: 2800 };
+const PREVIEW_WIDTH = { single: 960, grid: 960, strip: 420, row: 1400 };
+function shotCount(mode) { return mode === 'single' ? 1 : 4; }
+
+function compose(ctx, L, slots, mirror) {
+  const { W, H, b, cap, rects } = L;
   const th = THEMES[S.theme] || THEMES.sweater;
   th.frame(ctx, W, H, b, cap);
-  const rects = [];
-  if (mode === 'grid') {
-    const g = Math.round(W * .012), cw = (area.w - g) / 2, ch = (area.h - g) / 2;
-    for (let i = 0; i < 4; i++) rects.push({ x: area.x + (i % 2) * (cw + g), y: area.y + Math.floor(i / 2) * (ch + g), w: cw, h: ch });
-  } else rects.push(area);
   rects.forEach((r, i) => {
     const src = slots[i];
     drawCover(ctx, src, r.x, r.y, r.w, r.h, mirror);
@@ -515,26 +559,31 @@ function compose(ctx, W, H, slots, mirror, mode) {
       ctx.save(); ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.font = `700 ${Math.round(r.h * .35)}px Fredoka, sans-serif`; ctx.fillText(String(i + 1), r.x + r.w / 2, r.y + r.h / 2); ctx.restore();
     }
-    if (th.keyline) { ctx.save(); ctx.strokeStyle = th.keyline; ctx.lineWidth = Math.max(2, W * .003); ctx.strokeRect(r.x, r.y, r.w, r.h); ctx.restore(); }
+    if (th.keyline) { ctx.save(); ctx.strokeStyle = th.keyline; ctx.lineWidth = Math.max(2, Math.min(W, H) * .004); ctx.strokeRect(r.x, r.y, r.w, r.h); ctx.restore(); }
   });
 }
 
 /* ---------- live preview ---------- */
 function liveSlots() {
-  const n = S.mode === 'grid' ? 4 : 1;
+  const n = shotCount(S.mode);
   if (!state.busy) return Array(n).fill(video);
   return Array.from({ length: n }, (_, i) => i < state.shots.length ? state.shots[i] : (i === state.shots.length ? video : null));
 }
 function loop() {
-  if (state.screen === 'home' && video.readyState >= 2) compose(pctx, preview.width, preview.height, liveSlots(), true, S.mode);
+  if (state.screen === 'home' && video.readyState >= 2) {
+    const L = layoutFor(S.mode, PREVIEW_WIDTH[S.mode] || 960);
+    if (preview.width !== L.W || preview.height !== L.H) { preview.width = L.W; preview.height = L.H; sizePreview(); }
+    compose(pctx, L, liveSlots(), true);
+  }
   requestAnimationFrame(loop);
 }
 function sizePreview() {
   const stage = document.querySelector('#home .stage');
   const r = stage.getBoundingClientRect();
-  const w = Math.min(r.width * .98, r.height * 4 / 3);
+  const ar = preview.width / preview.height;
+  const w = Math.min(r.width * .98, r.height * .98 * ar);
   preview.style.width = Math.floor(w) + 'px';
-  preview.style.height = Math.floor(w * .75) + 'px';
+  preview.style.height = Math.floor(w / ar) + 'px';
 }
 addEventListener('resize', sizePreview);
 addEventListener('orientationchange', () => setTimeout(sizePreview, 300));
@@ -618,7 +667,7 @@ async function shoot() {
   if (!cameraAlive()) { try { await startCamera(); } catch (e) { toast('Camera not available'); return; } }
   unlockAudio(); requestWake();
   state.busy = true; state.shots = [];
-  state.n = S.mode === 'grid' ? 4 : 1;
+  state.n = shotCount(S.mode);
   document.body.classList.add('capturing');
   const label = $('#shotlabel');
   try {
@@ -631,8 +680,9 @@ async function shoot() {
     }
     label.textContent = 'Wrapping it up…';
     try { await document.fonts.ready; } catch (e) {}
-    const out = document.createElement('canvas'); out.width = OUT_W; out.height = OUT_H;
-    compose(out.getContext('2d'), OUT_W, OUT_H, state.shots, S.mirror, S.mode);
+    const L = layoutFor(S.mode, OUT_WIDTH[S.mode] || 1800);
+    const out = document.createElement('canvas'); out.width = L.W; out.height = L.H;
+    compose(out.getContext('2d'), L, state.shots, S.mirror);
     const blob = await new Promise(r => out.toBlob(r, 'image/jpeg', .9));
     state.lastBlob = blob;
     await dbAdd(blob); refreshBadge();
