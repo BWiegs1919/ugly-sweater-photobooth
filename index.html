@@ -136,7 +136,13 @@
   </div>
   <div class="stage"><canvas id="preview" width="960" height="720"></canvas></div>
   <div class="controls">
-    <div class="row" id="themes"></div>
+    <div class="row" style="align-items:center">
+      <div class="row" id="themes"></div>
+      <div class="seg" id="colorSeg">
+        <button data-bw="0" class="sel">🎨 Color</button>
+        <button data-bw="1">🖤 B&amp;W</button>
+      </div>
+    </div>
     <div class="row" style="align-items:center;gap:18px">
       <div class="seg" id="modeSeg">
         <button data-mode="single" class="sel">📸 Single</button>
@@ -240,7 +246,7 @@ const DEFAULTS = {
   kicker: '4th Annual',
   caption: 'The Wiegman Ugly Sweater Party',
   sub: 'Saturday, December 5, 2026',
-  timer: 3, gap: 2, idle: 60, mirror: false, sound: true, theme: 'wiegman', mode: 'single'
+  timer: 3, gap: 2, idle: 60, mirror: false, sound: true, theme: 'wiegman', mode: 'single', bw: false
 };
 function loadSettings() {
   try { return Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem('pb-settings-v2') || '{}')); }
@@ -316,11 +322,42 @@ function drawCover(ctx, src, x, y, w, h, mirror) {
     ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(x, y, w, h);
   } else {
     const s = Math.max(w / sw, h / sh), cw = w / s, ch = h / s, sx = (sw - cw) / 2, sy = (sh - ch) / 2;
-    if (mirror) { ctx.translate(x + w, y); ctx.scale(-1, 1); ctx.drawImage(src, sx, sy, cw, ch, 0, 0, w, h); }
+    const bw = S.bw && src !== null;
+    if (bw && FILTER_OK) ctx.filter = 'grayscale(1) contrast(1.35) brightness(1.06)';
+    if (mirror) { ctx.save(); ctx.translate(x + w, y); ctx.scale(-1, 1); ctx.drawImage(src, sx, sy, cw, ch, 0, 0, w, h); ctx.restore(); }
     else ctx.drawImage(src, sx, sy, cw, ch, x, y, w, h);
+    ctx.filter = 'none';
+    if (bw) {
+      if (!FILTER_OK) grayPixels(ctx, x, y, w, h);
+      // soft vignette, like an old booth print
+      const g = ctx.createRadialGradient(x + w / 2, y + h / 2, Math.min(w, h) * .35, x + w / 2, y + h / 2, Math.hypot(w, h) * .55);
+      g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,.42)');
+      ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
+    }
   }
   ctx.restore();
 }
+// Fallback for browsers without canvas filters (older iPadOS): grayscale + contrast by hand.
+function grayPixels(ctx, x, y, w, h) {
+  x = Math.round(x); y = Math.round(y); w = Math.round(w); h = Math.round(h);
+  try {
+    const img = ctx.getImageData(x, y, w, h), d = img.data;
+    for (let i = 0; i < d.length; i += 4) {
+      let v = d[i] * .299 + d[i + 1] * .587 + d[i + 2] * .114;
+      v = (v - 128) * 1.35 + 128 + 8;
+      v = v < 0 ? 0 : v > 255 ? 255 : v;
+      d[i] = d[i + 1] = d[i + 2] = v;
+    }
+    ctx.putImageData(img, x, y);
+  } catch (e) {}
+}
+const FILTER_OK = (() => {
+  try {
+    const c = document.createElement('canvas'); c.width = c.height = 2; const x = c.getContext('2d');
+    x.filter = 'grayscale(1)'; x.fillStyle = '#ff0000'; x.fillRect(0, 0, 2, 2);
+    const d = x.getImageData(0, 0, 1, 1).data; return d[0] === d[1] && d[1] === d[2];
+  } catch (e) { return false; }
+})();
 
 const SNOWFLAKE = ['#..#..#', '.#.#.#.', '..###..', '#######', '..###..', '.#.#.#.', '#..#..#'];
 const TREE      = ['...#...', '..###..', '.#####.', '..###..', '.#####.', '#######', '...#...'];
@@ -818,6 +855,8 @@ function buildThemes() {
     row.appendChild(b);
   });
 }
+function syncColor() { document.querySelectorAll('#colorSeg button').forEach(b => b.classList.toggle('sel', (b.dataset.bw === '1') === !!S.bw)); }
+document.querySelectorAll('#colorSeg button').forEach(b => b.addEventListener('click', () => { if (state.busy) return; S.bw = b.dataset.bw === '1'; saveSettings(); syncColor(); }));
 function syncMode() { document.querySelectorAll('#modeSeg button').forEach(b => b.classList.toggle('sel', b.dataset.mode === S.mode)); }
 document.querySelectorAll('#modeSeg button').forEach(b => b.addEventListener('click', () => { if (state.busy) return; S.mode = b.dataset.mode; saveSettings(); syncMode(); }));
 
@@ -875,7 +914,7 @@ function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.ad
 })();
 
 try { ['400 40px "Kaushan Script"', '700 40px "Mountains of Christmas"', '600 40px Fredoka', '700 40px Fredoka'].forEach(f => document.fonts.load(f)); } catch (e) {}
-buildThemes(); syncMode(); refreshBadge(); loop();
+buildThemes(); syncMode(); syncColor(); refreshBadge(); loop();
 })();
 </script>
 </body>
